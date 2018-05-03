@@ -1,0 +1,84 @@
+# This is a sample build configuration for PHP.
+# Check our guides at https://confluence.atlassian.com/x/e8YWN for more examples.
+# Only use spaces to indent your .yml configuration.
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+# image: php:7.1.1
+#image: zaherg/php-7.2-dusk-bitbucket-pipelines:latest
+#max-time: 3
+image: smartapps/bitbucket-pipelines-debian-9
+
+pipelines:
+  branches:
+   develop:
+    - step:
+        caches:
+          - composer
+        script:
+          # upload new data if any push
+          - apt-get update
+          #- apt-get -qq install wget
+          #- wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+          #- sh -c 'echo "deb https://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+          #- apt-get update
+          - apt-get -y install libxi6 libgconf-2-4
+          #- apt-get -qq install google-chrome-stable
+          - dpkg -i _other/chromedriver_lastest/chrome64_64.0.3282.140.deb &&
+          - apt-get -f --force-yes --yes install &&
+          - dpkg -i _other/chromedriver_lastest/chrome64_64.0.3282.140.deb
+          - apt-get -qq install git-ftp
+          - git ftp push --user $FTP_USERNAME --passwd $FTP_PASSWORD $FTP_HOST_PATH
+          # php dusk test
+          #- apt-get update && apt-get install -qy git curl libmcrypt-dev mysql-client
+          #- yes | pecl install mcrypt-1.0.1
+          #- docker-php-ext-install pdo_mysql
+          #- ssh resjobmatch@resjobmatch.xsrv.jp -p 10022
+          #- cd resjobmatch.xsrv.jp/public_html/
+          - rm /usr/bin/php7.0
+          - ln -s /usr/bin/php7.1 /usr/bin/php7.0
+          - php -v
+          #- export CACHE_DRIVER=redis
+          #- export SESSION_DRIVER=redis
+          #- export DB_CONNECTION=mysql
+          #- sed -i "s/DB_DATABASE=.*/DB_DATABASE=resjobmatch_jobmatching/" .env
+          #- sed -i "s/DB_USERNAME=.*/DB_USERNAME=resjobmatch_jobs/" .env
+          #- sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=XrtyE45YUi/" .env
+          - service mysql start
+          - mysql -h localhost --user=root --password=root -e "CREATE DATABASE resjobmatch_jobmatching;"
+          - mysql -h localhost --user=root --password=root resjobmatch_jobmatching < _sql/gruneasia_jobmatching.sql
+          #- php artisan migrate --path database/migrations/jobmatching/lastest
+          #- php artisan db:seed
+          - cd laravel
+          - cp .env.dusk .env
+          #- composer install --no-progress --no-suggest --prefer-dist
+          - composer update --no-scripts
+          - cd ..
+          - rm -rf laravel/vendor/laravel/dusk/bin/chromedriver-linux
+          - cp _other/chromedriver_lastest/chromedriver-linux-2.37 laravel/vendor/laravel/dusk/bin/chromedriver-linux
+          - cd laravel
+          - chmod a+x vendor/laravel/dusk/bin/chromedriver-linux
+          - php artisan dusk:install
+          - vendor/laravel/dusk/bin/chromedriver-linux -v
+          - vendor/laravel/dusk/bin/chromedriver-linux &
+          - php artisan key:generate
+          - php artisan serve &
+          - curl -vk http://localhost:8000 &
+          - sleep 10
+          - php artisan dusk
+          #- vendor/bin/phpunit
+#        services:
+#          - mysql
+
+#definitions:
+#  caches:
+#    vendor-directory: vendor
+
+#  services:
+#    redis:
+#      image: redis
+#    mysql:
+#      image: mysql:5.7
+#      environment:
+#        MYSQL_DATABASE: 'resjobmatch_jobmatching'
+#        MYSQL_ROOT_USER: 'resjobmatch_jobs'
+#        MYSQL_ROOT_PASSWORD: 'XrtyE45YUi'
